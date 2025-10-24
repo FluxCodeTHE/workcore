@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Star, ExternalLink } from "lucide-react";
+import { useTracking } from "@/hooks/useTracking";
 
 interface ProductCardProps {
   image: string;
@@ -12,6 +13,7 @@ interface ProductCardProps {
   reviewCount: number;
   badge?: string;
   affiliateLink: string;
+  productId?: string;
 }
 
 const ProductCard = ({
@@ -24,7 +26,16 @@ const ProductCard = ({
   reviewCount,
   badge,
   affiliateLink,
+  productId,
 }: ProductCardProps) => {
+  const { trackProductClick } = useTracking();
+
+  const handleClick = () => {
+    if (productId) {
+      trackProductClick(productId);
+    }
+  };
+
   return (
     <div className="group bg-card rounded-xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300 transform hover:-translate-y-1">
       {badge && (
@@ -70,7 +81,12 @@ const ProductCard = ({
           className="w-full group/btn" 
           asChild
         >
-          <a href={affiliateLink} target="_blank" rel="noopener noreferrer">
+          <a 
+            href={affiliateLink} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            onClick={handleClick}
+          >
             Comprar Agora
             <ExternalLink className="ml-2 h-4 w-4 group-hover/btn:translate-x-1 transition-transform" />
           </a>

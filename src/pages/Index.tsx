@@ -1,114 +1,74 @@
+import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import CategoryCard from "@/components/CategoryCard";
 import ProductCard from "@/components/ProductCard";
 import BlogCard from "@/components/BlogCard";
-import { 
-  Laptop, 
-  Monitor, 
-  Armchair, 
-  Keyboard, 
-  Mouse, 
-  Webcam, 
-  Headphones,
-  Cable
-} from "lucide-react";
+import { Loader2 } from "lucide-react";
+import * as Icons from "lucide-react";
+import { useTracking } from "@/hooks/useTracking";
 
 const Index = () => {
-  const categories = [
-    {
-      icon: Laptop,
-      title: "Notebooks",
-      description: "Potência e mobilidade para trabalho remoto",
-      productCount: 24
-    },
-    {
-      icon: Monitor,
-      title: "Monitores",
-      description: "Telas de alta qualidade para produtividade",
-      productCount: 18
-    },
-    {
-      icon: Armchair,
-      title: "Cadeiras Ergonômicas",
-      description: "Conforto durante longas jornadas",
-      productCount: 12
-    },
-    {
-      icon: Keyboard,
-      title: "Teclados",
-      description: "Digitação confortável e precisa",
-      productCount: 15
-    },
-    {
-      icon: Mouse,
-      title: "Mouses",
-      description: "Controle ergonômico e responsivo",
-      productCount: 20
-    },
-    {
-      icon: Webcam,
-      title: "Webcams",
-      description: "Imagem profissional para videoconferências",
-      productCount: 8
-    },
-    {
-      icon: Headphones,
-      title: "Fones de Ouvido",
-      description: "Áudio cristalino e cancelamento de ruído",
-      productCount: 16
-    },
-    {
-      icon: Cable,
-      title: "Acessórios",
-      description: "Tudo para otimizar seu setup",
-      productCount: 30
-    }
-  ];
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const { trackProductView } = useTracking();
 
-  const featuredProducts = [
-    {
-      image: "https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=800&auto=format&fit=crop",
-      title: "Notebook Dell XPS 15 - 11ª Geração Intel i7",
-      description: "Perfeito para multitarefas e trabalho pesado com 16GB RAM e SSD 512GB",
-      price: "R$ 8.999",
-      originalPrice: "R$ 10.499",
-      rating: 5,
-      reviewCount: 234,
-      badge: "Mais Vendido",
-      affiliateLink: "#"
+  const { data: categories, isLoading: categoriesLoading } = useQuery({
+    queryKey: ["categories"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("categories")
+        .select("*")
+        .order("name");
+
+      if (error) throw error;
+      return data;
     },
-    {
-      image: "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800&auto=format&fit=crop",
-      title: "Monitor LG UltraWide 34\" Curvo IPS",
-      description: "Tela curva de 34 polegadas para máxima produtividade e imersão",
-      price: "R$ 2.499",
-      originalPrice: "R$ 2.999",
-      rating: 5,
-      reviewCount: 189,
-      badge: "Melhor Custo-Benefício",
-      affiliateLink: "#"
+  });
+
+  const { data: products, isLoading: productsLoading } = useQuery({
+    queryKey: ["products", selectedCategory, searchTerm],
+    queryFn: async () => {
+      let query = supabase
+        .from("products")
+        .select("*, categories(name)")
+        .eq("is_active", true);
+
+      if (selectedCategory) {
+        query = query.eq("category_id", selectedCategory);
+      }
+
+      if (searchTerm) {
+        query = query.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
+      }
+
+      const { data, error } = await query.order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return data;
     },
-    {
-      image: "https://images.unsplash.com/photo-1505843490538-5133c6c7d786?w=800&auto=format&fit=crop",
-      title: "Cadeira Ergonômica Herman Miller Aeron",
-      description: "Design ergonômico premiado com ajustes completos para máximo conforto",
-      price: "R$ 6.499",
-      rating: 5,
-      reviewCount: 456,
-      affiliateLink: "#"
-    },
-    {
-      image: "https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=800&auto=format&fit=crop",
-      title: "Teclado Mecânico Logitech MX Keys",
-      description: "Teclas retroiluminadas e experiência de digitação premium",
-      price: "R$ 699",
-      originalPrice: "R$ 849",
-      rating: 4,
-      reviewCount: 312,
-      affiliateLink: "#"
-    }
-  ];
+  });
+
+  useEffect(() => {
+    products?.forEach((product) => {
+      trackProductView(product.id);
+    });
+  }, [products]);
+
+  const categoriesWithCounts = categories?.map((cat) => {
+    const count = products?.filter((p) => p.category_id === cat.id).length || 0;
+    const IconComponent = (Icons as any)[cat.icon] || Icons.Package;
+    
+    return {
+      icon: IconComponent,
+      title: cat.name,
+      description: cat.description || "",
+      productCount: count,
+      id: cat.id,
+    };
+  });
 
   const blogPosts = [
     {
@@ -139,7 +99,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen">
-      <Navbar />
+      <Navbar onSearch={setSearchTerm} searchTerm={searchTerm} />
       
       <Hero />
 
@@ -155,11 +115,22 @@ const Index = () => {
             </p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {categories.map((category, index) => (
-              <CategoryCard key={index} {...category} />
-            ))}
-          </div>
+          {categoriesLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {categoriesWithCounts?.map((category) => (
+                <div key={category.id} onClick={() => {
+                  setSelectedCategory(selectedCategory === category.id ? null : category.id);
+                  window.location.href = "#produtos";
+                }}>
+                  <CategoryCard {...category} />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -168,18 +139,52 @@ const Index = () => {
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Produtos em Destaque
+              {selectedCategory 
+                ? `Produtos - ${categoriesWithCounts?.find(c => c.id === selectedCategory)?.title}`
+                : searchTerm 
+                  ? `Resultados para "${searchTerm}"`
+                  : "Produtos em Destaque"
+              }
             </h2>
+            {selectedCategory && (
+              <button 
+                onClick={() => setSelectedCategory(null)}
+                className="text-primary hover:underline mb-4"
+              >
+                Ver todos os produtos
+              </button>
+            )}
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              Seleção especial dos melhores equipamentos com ótimo custo-benefício
+              {products?.length === 0 
+                ? "Nenhum produto encontrado" 
+                : `${products?.length || 0} produto(s) disponíve${products?.length === 1 ? 'l' : 'is'}`
+              }
             </p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {featuredProducts.map((product, index) => (
-              <ProductCard key={index} {...product} />
-            ))}
-          </div>
+          {productsLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {products?.map((product) => (
+                <ProductCard 
+                  key={product.id} 
+                  image={product.image_url}
+                  title={product.title}
+                  description={product.description}
+                  price={product.price}
+                  originalPrice={product.original_price || undefined}
+                  rating={product.rating}
+                  reviewCount={product.review_count}
+                  badge={product.badge || undefined}
+                  affiliateLink={product.affiliate_link}
+                  productId={product.id}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -219,8 +224,8 @@ const Index = () => {
               <h4 className="font-semibold mb-4">Links Rápidos</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li><a href="#" className="hover:text-primary transition-colors">Sobre Nós</a></li>
-                <li><a href="#" className="hover:text-primary transition-colors">Categorias</a></li>
-                <li><a href="#" className="hover:text-primary transition-colors">Blog</a></li>
+                <li><a href="#categorias" className="hover:text-primary transition-colors">Categorias</a></li>
+                <li><a href="#blog" className="hover:text-primary transition-colors">Blog</a></li>
                 <li><a href="#" className="hover:text-primary transition-colors">Contato</a></li>
               </ul>
             </div>
