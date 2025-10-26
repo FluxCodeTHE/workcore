@@ -118,7 +118,7 @@ const AdminCategories = () => {
           <h1 className="text-3xl font-bold mb-2">Categorias</h1>
           <p className="text-muted-foreground">Gerencie as categorias da loja</p>
         </div>
-        <Dialog open={open} onOpenChange={handleCloseDialog}>
+        <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />

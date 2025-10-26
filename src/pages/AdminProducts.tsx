@@ -218,7 +218,7 @@ const AdminProducts = () => {
           <h1 className="text-3xl font-bold mb-2">Produtos</h1>
           <p className="text-muted-foreground">Gerencie os produtos da loja</p>
         </div>
-        <Dialog open={open} onOpenChange={handleCloseDialog}>
+        <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
