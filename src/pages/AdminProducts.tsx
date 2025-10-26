@@ -1,20 +1,21 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Plus, Pencil, Trash2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const AdminProducts = () => {
   const [open, setOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -23,7 +24,13 @@ const AdminProducts = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("*, categories(name)")
+        .select(`
+          *,
+          product_categories(
+            category_id,
+            categories(id, name)
+          )
+        `)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -45,33 +52,87 @@ const AdminProducts = () => {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (formData: any) => {
-      const { error } = await supabase.from("products").insert(formData);
-      if (error) throw error;
+    mutationFn: async ({ productData, categoryIds }: { productData: any; categoryIds: string[] }) => {
+      const { data: product, error: productError } = await supabase
+        .from("products")
+        .insert(productData)
+        .select()
+        .single();
+      
+      if (productError) throw productError;
+
+      if (categoryIds.length > 0) {
+        const categoryRelations = categoryIds.map(catId => ({
+          product_id: product.id,
+          category_id: catId
+        }));
+        
+        const { error: categoriesError } = await supabase
+          .from("product_categories")
+          .insert(categoryRelations);
+        
+        if (categoriesError) throw categoriesError;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-products"] });
       toast({ title: "Produto criado com sucesso!" });
       setOpen(false);
+      setSelectedCategories([]);
     },
-    onError: () => {
-      toast({ title: "Erro ao criar produto", variant: "destructive" });
+    onError: (error: any) => {
+      toast({ 
+        title: "Erro ao criar produto", 
+        description: error.message,
+        variant: "destructive" 
+      });
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, formData }: { id: string; formData: any }) => {
-      const { error } = await supabase.from("products").update(formData).eq("id", id);
-      if (error) throw error;
+    mutationFn: async ({ id, productData, categoryIds }: { id: string; productData: any; categoryIds: string[] }) => {
+      const { error: productError } = await supabase
+        .from("products")
+        .update(productData)
+        .eq("id", id);
+      
+      if (productError) throw productError;
+
+      // Remove categorias antigas
+      const { error: deleteError } = await supabase
+        .from("product_categories")
+        .delete()
+        .eq("product_id", id);
+      
+      if (deleteError) throw deleteError;
+
+      // Adiciona novas categorias
+      if (categoryIds.length > 0) {
+        const categoryRelations = categoryIds.map(catId => ({
+          product_id: id,
+          category_id: catId
+        }));
+        
+        const { error: categoriesError } = await supabase
+          .from("product_categories")
+          .insert(categoryRelations);
+        
+        if (categoriesError) throw categoriesError;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-products"] });
       toast({ title: "Produto atualizado com sucesso!" });
       setOpen(false);
       setEditingProduct(null);
+      setSelectedCategories([]);
     },
-    onError: () => {
-      toast({ title: "Erro ao atualizar produto", variant: "destructive" });
+    onError: (error: any) => {
+      toast({ 
+        title: "Erro ao atualizar produto",
+        description: error.message, 
+        variant: "destructive" 
+      });
     },
   });
 
@@ -92,14 +153,11 @@ const AdminProducts = () => {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const data = {
+    const productData = {
       title: formData.get("title") as string,
       description: formData.get("description") as string,
-      price: formData.get("price") as string,
-      original_price: formData.get("original_price") as string || null,
       image_url: formData.get("image_url") as string,
       affiliate_link: formData.get("affiliate_link") as string,
-      category_id: formData.get("category_id") as string || null,
       rating: parseInt(formData.get("rating") as string),
       review_count: parseInt(formData.get("review_count") as string),
       badge: formData.get("badge") as string || null,
@@ -107,20 +165,42 @@ const AdminProducts = () => {
     };
 
     if (editingProduct) {
-      updateMutation.mutate({ id: editingProduct.id, formData: data });
+      updateMutation.mutate({ 
+        id: editingProduct.id, 
+        productData, 
+        categoryIds: selectedCategories 
+      });
     } else {
-      createMutation.mutate(data);
+      createMutation.mutate({ productData, categoryIds: selectedCategories });
     }
   };
 
   const handleEdit = (product: any) => {
     setEditingProduct(product);
+    const productCategoryIds = product.product_categories?.map((pc: any) => pc.category_id) || [];
+    setSelectedCategories(productCategoryIds);
     setOpen(true);
   };
 
   const handleCloseDialog = () => {
     setOpen(false);
     setEditingProduct(null);
+    setSelectedCategories([]);
+  };
+
+  useEffect(() => {
+    if (!open) {
+      setSelectedCategories([]);
+      setEditingProduct(null);
+    }
+  }, [open]);
+
+  const toggleCategory = (categoryId: string) => {
+    setSelectedCategories(prev => 
+      prev.includes(categoryId) 
+        ? prev.filter(id => id !== categoryId)
+        : [...prev, categoryId]
+    );
   };
 
   if (isLoading) {
@@ -160,17 +240,6 @@ const AdminProducts = () => {
                 <Textarea id="description" name="description" required defaultValue={editingProduct?.description} />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="price">Preço*</Label>
-                  <Input id="price" name="price" required defaultValue={editingProduct?.price} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="original_price">Preço Original</Label>
-                  <Input id="original_price" name="original_price" defaultValue={editingProduct?.original_price} />
-                </div>
-              </div>
-
               <div className="space-y-2">
                 <Label htmlFor="image_url">URL da Imagem*</Label>
                 <Input id="image_url" name="image_url" type="url" required defaultValue={editingProduct?.image_url} />
@@ -182,17 +251,24 @@ const AdminProducts = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="category_id">Categoria</Label>
-                <Select name="category_id" defaultValue={editingProduct?.category_id}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione uma categoria" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories?.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Categorias</Label>
+                <div className="border rounded-md p-4 space-y-2 max-h-48 overflow-y-auto">
+                  {categories?.map((cat) => (
+                    <div key={cat.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`cat-${cat.id}`}
+                        checked={selectedCategories.includes(cat.id)}
+                        onCheckedChange={() => toggleCategory(cat.id)}
+                      />
+                      <Label 
+                        htmlFor={`cat-${cat.id}`}
+                        className="text-sm font-normal cursor-pointer"
+                      >
+                        {cat.name}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -238,8 +314,7 @@ const AdminProducts = () => {
             <TableRow>
               <TableHead>Imagem</TableHead>
               <TableHead>Título</TableHead>
-              <TableHead>Categoria</TableHead>
-              <TableHead>Preço</TableHead>
+              <TableHead>Categorias</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
@@ -251,8 +326,11 @@ const AdminProducts = () => {
                   <img src={product.image_url} alt={product.title} className="w-12 h-12 object-cover rounded" />
                 </TableCell>
                 <TableCell className="font-medium">{product.title}</TableCell>
-                <TableCell>{product.categories?.name || "Sem categoria"}</TableCell>
-                <TableCell>{product.price}</TableCell>
+                <TableCell>
+                  {product.product_categories?.length > 0 
+                    ? product.product_categories.map((pc: any) => pc.categories?.name).filter(Boolean).join(", ")
+                    : "Sem categoria"}
+                </TableCell>
                 <TableCell>
                   <span className={`px-2 py-1 rounded text-xs ${product.is_active ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}`}>
                     {product.is_active ? "Ativo" : "Inativo"}

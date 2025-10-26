@@ -41,6 +41,42 @@ export type Database = {
         }
         Relationships: []
       }
+      product_categories: {
+        Row: {
+          category_id: string
+          created_at: string
+          id: string
+          product_id: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          id?: string
+          product_id: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          id?: string
+          product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_categories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_categories_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_clicks: {
         Row: {
           clicked_at: string
@@ -113,7 +149,7 @@ export type Database = {
           image_url: string
           is_active: boolean
           original_price: string | null
-          price: string
+          price: string | null
           rating: number
           review_count: number
           title: string
@@ -129,7 +165,7 @@ export type Database = {
           image_url: string
           is_active?: boolean
           original_price?: string | null
-          price: string
+          price?: string | null
           rating?: number
           review_count?: number
           title: string
@@ -145,7 +181,7 @@ export type Database = {
           image_url?: string
           is_active?: boolean
           original_price?: string | null
-          price?: string
+          price?: string | null
           rating?: number
           review_count?: number
           title?: string

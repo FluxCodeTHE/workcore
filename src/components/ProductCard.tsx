@@ -7,8 +7,6 @@ interface ProductCardProps {
   image: string;
   title: string;
   description: string;
-  price: string;
-  originalPrice?: string;
   rating: number;
   reviewCount: number;
   badge?: string;
@@ -20,8 +18,6 @@ const ProductCard = ({
   image,
   title,
   description,
-  price,
-  originalPrice,
   rating,
   reviewCount,
   badge,

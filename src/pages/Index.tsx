@@ -33,12 +33,14 @@ const Index = () => {
     queryFn: async () => {
       let query = supabase
         .from("products")
-        .select("*, categories(name)")
+        .select(`
+          *,
+          product_categories(
+            category_id,
+            categories(id, name)
+          )
+        `)
         .eq("is_active", true);
-
-      if (selectedCategory) {
-        query = query.eq("category_id", selectedCategory);
-      }
 
       if (searchTerm) {
         query = query.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
@@ -47,6 +49,14 @@ const Index = () => {
       const { data, error } = await query.order("created_at", { ascending: false });
 
       if (error) throw error;
+
+      // Filtrar por categoria se selecionada
+      if (selectedCategory && data) {
+        return data.filter(product => 
+          product.product_categories?.some((pc: any) => pc.category_id === selectedCategory)
+        );
+      }
+
       return data;
     },
   });
@@ -58,7 +68,9 @@ const Index = () => {
   }, [products]);
 
   const categoriesWithCounts = categories?.map((cat) => {
-    const count = products?.filter((p) => p.category_id === cat.id).length || 0;
+    const count = products?.filter((p) => 
+      p.product_categories?.some((pc: any) => pc.category_id === cat.id)
+    ).length || 0;
     const IconComponent = (Icons as any)[cat.icon] || Icons.Package;
     
     return {
@@ -174,8 +186,6 @@ const Index = () => {
                   image={product.image_url}
                   title={product.title}
                   description={product.description}
-                  price={product.price}
-                  originalPrice={product.original_price || undefined}
                   rating={product.rating}
                   reviewCount={product.review_count}
                   badge={product.badge || undefined}
