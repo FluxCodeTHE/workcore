@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import React, { useEffect } from "react";
 import { useNavigate, Outlet, Link, useLocation } from "react-router-dom";
 import { useAdmin } from "@/hooks/useAdmin";
 import { Button } from "@/components/ui/button";
