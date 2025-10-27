@@ -82,32 +82,32 @@ const Index = () => {
     };
   });
 
-  const blogPosts = [
-    {
-      image: "https://images.unsplash.com/photo-1484480974693-6ca0a78fb36b?w=800&auto=format&fit=crop",
-      title: "Como Montar um Home Office Produtivo em 2024",
-      excerpt: "Descubra as melhores práticas e equipamentos essenciais para criar um ambiente de trabalho remoto eficiente e confortável.",
-      date: "15 Jan 2024",
-      readTime: "5 min",
-      category: "Guia Completo"
+  const { data: blogPosts, isLoading: blogLoading } = useQuery({
+    queryKey: ["blog-posts"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("blog_posts")
+        .select("*")
+        .eq("is_published", true)
+        .order("published_at", { ascending: false })
+        .limit(3);
+
+      if (error) throw error;
+      
+      return data?.map(post => ({
+        image: post.image_url,
+        title: post.title,
+        excerpt: post.excerpt,
+        date: new Date(post.published_at || post.created_at).toLocaleDateString("pt-BR", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric"
+        }),
+        readTime: post.read_time,
+        category: post.category
+      })) || [];
     },
-    {
-      image: "https://images.unsplash.com/photo-1593642532400-2682810df593?w=800&auto=format&fit=crop",
-      title: "Ergonomia no Home Office: Evite Dores e Lesões",
-      excerpt: "Aprenda a posicionar corretamente seus equipamentos e manter uma postura saudável durante o trabalho remoto.",
-      date: "12 Jan 2024",
-      readTime: "7 min",
-      category: "Saúde"
-    },
-    {
-      image: "https://images.unsplash.com/photo-1542744094-3a31f272c490?w=800&auto=format&fit=crop",
-      title: "10 Dicas para Aumentar sua Produtividade em Casa",
-      excerpt: "Técnicas comprovadas e ferramentas essenciais para maximizar seu desempenho trabalhando remotamente.",
-      date: "08 Jan 2024",
-      readTime: "6 min",
-      category: "Produtividade"
-    }
-  ];
+  });
 
   return (
     <div className="min-h-screen">
@@ -210,11 +210,21 @@ const Index = () => {
             </p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {blogPosts.map((post, index) => (
-              <BlogCard key={index} {...post} />
-            ))}
-          </div>
+          {blogLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : blogPosts && blogPosts.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {blogPosts.map((post, index) => (
+                <BlogCard key={index} {...post} />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">Nenhum artigo publicado ainda</p>
+            </div>
+          )}
         </div>
       </section>
 

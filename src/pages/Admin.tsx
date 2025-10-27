@@ -4,7 +4,7 @@ import { useAdmin } from "@/hooks/useAdmin";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, LayoutDashboard, Package, FolderTree, LogOut, Users } from "lucide-react";
+import { Loader2, LayoutDashboard, Package, FolderTree, LogOut, Users, FileText } from "lucide-react";
 
 const Admin = () => {
   const { user, isAdmin, loading } = useAdmin();
@@ -44,6 +44,7 @@ const Admin = () => {
     { to: "/admin", icon: LayoutDashboard, label: "Dashboard", exact: true },
     { to: "/admin/products", icon: Package, label: "Produtos" },
     { to: "/admin/categories", icon: FolderTree, label: "Categorias" },
+    { to: "/admin/blog", icon: FileText, label: "Blog" },
     { to: "/admin/users", icon: Users, label: "Usuários" },
   ];
 
